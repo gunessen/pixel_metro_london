@@ -1,6 +1,6 @@
 // Shift engine: builds the exercise queue, re-queues mistakes, counts coins/combo/stars.
 // No DOM in here, so it can be unit-tested.
-import { selectItems, applyAnswer, shuffle } from './srs.js';
+import { selectItems, applyAnswer, shuffle, weight } from './srs.js';
 import { STATIONS_PER_LINE, TEST_STATION } from './data/lines.js';
 
 export const SHIFT_LEN = 10;
@@ -11,20 +11,70 @@ export const COMBO_STEP = 5;
 export const COMBO_MAX = 25;
 
 export const RECOGNITION = { 'pick-word': 3, 'pick-picture': 3, 'listen-pick': 2 };
-export const WRITING = { type: 3, 'fill-gap': 2 };
+export const WRITING = { type: 3, 'fill-gap': 2, copy: 1 };
 
 /** Exercise mix per station (index 0–4). Test day uses RECOGNITION/WRITING 30/70. */
 export const STATION_MIX = [
-  { 'pick-word': 3, 'pick-picture': 3, 'listen-pick': 2 },
+  { 'pick-word': 3, 'pick-picture': 3, 'listen-pick': 2, 'match-pairs': 1 },
   { 'pick-word': 2, 'pick-picture': 2, 'listen-pick': 1, tiles: 3 },
-  { tiles: 3, 'fill-gap': 3, 'pick-word': 1 },
-  { type: 4, 'fill-gap': 3, tiles: 1 },
-  { type: 5, 'fill-gap': 3 },
+  { tiles: 3, 'fill-gap': 3, 'sentence-order': 2 },
+  { type: 4, copy: 2, 'fill-gap': 3 },
+  { type: 5, copy: 1, 'fill-gap': 3 },
 ];
 
-export function shiftMode(kind, station) {
+/**
+ * Per-line plans. `stations[i]` is the exercise mix of station i; an exercise type is only
+ * used for items it can show (clock-* only for clock patterns, word types only for words).
+ * `genShare`: part of the shift made of generated items (clock patterns), which may come
+ * several times with different times.
+ */
+const DEFAULT_PLAN = { stations: STATION_MIX, writing: WRITING, recognition: RECOGNITION, genShare: 0 };
+
+export const PLANS = {
+  time: {
+    stations: [
+      { 'clock-read': 1, 'pick-word': 2, 'pick-picture': 2, 'listen-pick': 1 },
+      { 'clock-read': 1, tiles: 3, 'match-pairs': 1, 'pick-word': 1 },
+      { 'clock-write': 3, 'clock-read': 1, tiles: 2, 'fill-gap': 2 },
+      { 'clock-write': 3, 'clock-set': 2, type: 3, copy: 1 },
+      { 'clock-write': 3, 'clock-set': 2, type: 2, 'fill-gap': 2 },
+    ],
+    writing: { 'clock-write': 1, type: 2, 'fill-gap': 1 },
+    recognition: { 'clock-read': 2, 'clock-set': 1, 'pick-word': 1 },
+    genShare: 0.7,
+    // Station 1 (index 0) starts with full and half hours only.
+    patterns: [['oclock', 'half-past']],
+  },
+  prepositions: {
+    stations: [
+      { 'prep-pick': 3, 'prep-place': 1 },
+      { 'prep-pick': 2, 'prep-place': 3 },
+      { 'prep-write': 3, 'prep-place': 2, 'sentence-order': 2 },
+      { 'prep-write': 4, 'prep-place': 1, 'sentence-order': 1 },
+      { 'prep-write': 5, 'prep-place': 1 },
+    ],
+    writing: { 'prep-write': 1 },
+    recognition: { 'prep-pick': 2, 'prep-place': 1 },
+    genShare: 0,
+  },
+};
+
+export function planFor(topic) {
+  return { ...DEFAULT_PLAN, ...(PLANS[topic] || {}) };
+}
+
+/** Every exercise type that any line uses (for "is this line playable at all"). */
+function allTypes() {
+  const all = {};
+  for (const plan of [DEFAULT_PLAN, ...Object.values(PLANS)]) {
+    Object.assign(all, plan.writing, plan.recognition, ...plan.stations);
+  }
+  return all;
+}
+
+export function shiftMode(kind, station, topic = null) {
   if (kind !== 'station') {
-    return { hints: false, german: false, gapMode: 'type', extraLetters: 2, retry: false };
+    return { hints: false, german: false, gapMode: 'type', extraLetters: 2, retry: false, patterns: null };
   }
   return {
     hints: true,
@@ -32,6 +82,7 @@ export function shiftMode(kind, station) {
     gapMode: station <= 2 ? 'tiles' : 'type',
     extraLetters: station >= 2 ? 2 : 0,
     retry: true,
+    patterns: planFor(topic).patterns?.[station] ?? null,
   };
 }
 
@@ -68,8 +119,69 @@ function usableWith(item, mix, exercises, info) {
 
 /** Items of a topic that can be practised at all (for "coming soon" lines and the fit meter). */
 export function playableItems(words, topic, exercises, info) {
-  const all = { ...RECOGNITION, ...WRITING, ...Object.assign({}, ...STATION_MIX) };
+  const all = allTypes();
   return words.filter((w) => (!topic || w.topic === topic) && usableWith(w, all, exercises, info));
+}
+
+/** A queue entry. `params` is what the exercise generated (a time, a room scene …), kept for retries. */
+function mkSlot(item, type, exercises, info, rng) {
+  const params = type && exercises[type]?.makeParams ? exercises[type].makeParams(item, { rng, mode: info.mode, words: info.words }) : null;
+  return { item, type, retry: false, params };
+}
+
+/** Same question? (same item and same generated time/scene) */
+export function slotKey(slot) {
+  return slot.item.id + (slot.params ? '|' + JSON.stringify(slot.params) : '');
+}
+
+function weightedIndex(weights, rng) {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = rng() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r < 0) return i;
+  }
+  return weights.length - 1;
+}
+
+/**
+ * Choose `n` generated items (clock patterns), repeats allowed, weighted by SRS.
+ * At least 30 % are half past (the German "halb" trap) when it is in the pool.
+ */
+function pickGenerated(pool, n, getState, rng) {
+  if (!n || !pool.length) return [];
+  const out = [];
+  const half = pool.find((w) => w.pattern === 'half-past');
+  if (half) for (let i = 0; i < Math.ceil(n * 0.3); i++) out.push(half);
+  const weights = pool.map((w) => weight(getState(w.id)));
+  // Every pattern of the pool once (if there is room), then by weight.
+  for (const w of shuffle(pool, rng)) if (out.length < n && !out.includes(w)) out.push(w);
+  while (out.length < n) out.push(pool[weightedIndex(weights, rng)]);
+  return out;
+}
+
+/** Slots for generated items, avoiding the very same question twice. */
+function genSlots(items, mixFor, exercises, info, rng) {
+  const seen = new Set();
+  return items.map((item, i) => {
+    const mix = mixFor(i);
+    let slot = null;
+    for (let tries = 0; tries < 8; tries++) {
+      slot = mkSlot(item, chooseType(item, mix, exercises, info, rng), exercises, info, rng);
+      if (!seen.has(slotKey(slot))) break;
+    }
+    seen.add(slotKey(slot));
+    return slot;
+  });
+}
+
+/** Merge two queues, spreading `b` evenly between the entries of `a`. */
+function interleave(a, b, rng) {
+  const keyed = [
+    ...a.map((s, i) => [(i + 0.5) / a.length, s]),
+    ...b.map((s, i) => [(i + rng()) / b.length, s]),
+  ];
+  return keyed.sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 }
 
 /** Reorder so the same item never appears twice in a row (keeps intro-before-main order). */
@@ -113,17 +225,16 @@ export function spread(slots) {
   return out;
 }
 
-function buildStationQueue({ topic, station, words, exercises, info, getState, rng }) {
-  const mix = STATION_MIX[station];
-  const pool = words.filter((w) => w.topic === topic && usableWith(w, mix, exercises, info));
-  const items = selectItems(pool, getState, SHIFT_LEN, { maxNew: 4, rng });
+function buildItemSlots({ pool, n, mix, recognition, station, exercises, info, getState, rng }) {
+  if (n <= 0 || !pool.length) return [];
+  const items = selectItems(pool, getState, n, { maxNew: 4, rng });
   const rounds = [[], [], [], []];
   const typesOf = new Map(items.map((it) => [it.id, []]));
   let count = 0;
   const place = (item, type, minRound) => {
     let r = minRound;
     while (r < rounds.length - 1 && rounds[r].some((x) => x.item.id === item.id)) r++;
-    rounds[r].push({ item, type, retry: false });
+    rounds[r].push(mkSlot(item, type, exercises, info, rng));
     typesOf.get(item.id).push(type);
     count++;
   };
@@ -133,7 +244,7 @@ function buildStationQueue({ topic, station, words, exercises, info, getState, r
     const main = chooseType(item, mix, exercises, info, rng);
     if (isNew && station >= 2) {
       // New word at a writing station: show it once in a recognition exercise first.
-      const intro = chooseType(item, RECOGNITION, exercises, info, rng);
+      const intro = chooseType(item, recognition, exercises, info, rng);
       if (intro) place(item, intro, 0);
       place(item, main, intro ? 1 : 0);
     } else place(item, main, 0);
@@ -142,32 +253,62 @@ function buildStationQueue({ topic, station, words, exercises, info, getState, r
   // Few items (first shifts)? Repeat the weakest ones with a different exercise type.
   const byBox = [...items].sort((a, b) => (getState(a.id)?.box ?? 0) - (getState(b.id)?.box ?? 0));
   let guard = 0;
-  while (count < SHIFT_LEN && items.length && guard++ < 50) {
+  while (count < n && items.length && guard++ < 50) {
     for (const item of byBox) {
-      if (count >= SHIFT_LEN) break;
+      if (count >= n) break;
       const t = chooseType(item, mix, exercises, info, rng, typesOf.get(item.id));
       if (t) place(item, t, 1);
     }
   }
-  const flat = rounds.flatMap((r) => shuffle(r, rng));
-  return spread(flat).slice(0, SHIFT_LEN);
+  return rounds.flatMap((r) => shuffle(r, rng)).slice(0, n);
+}
+
+function buildStationQueue(args) {
+  const { topic, station, words, exercises, info, getState, rng } = args;
+  const plan = planFor(topic);
+  const mix = plan.stations[station];
+  const pool = words.filter((w) => w.topic === topic && usableWith(w, mix, exercises, info));
+  const genPool = pool.filter((w) => w.gen);
+  const itemPool = pool.filter((w) => !w.gen);
+  const nGen = !genPool.length ? 0 : itemPool.length ? Math.round(SHIFT_LEN * plan.genShare) : SHIFT_LEN;
+  const itemSlots = buildItemSlots({ ...args, pool: itemPool, n: SHIFT_LEN - nGen, mix, recognition: plan.recognition });
+  const gen = genSlots(pickGenerated(genPool, SHIFT_LEN - itemSlots.length, getState, rng), () => mix, exercises, info, rng);
+  return spread(interleave(itemSlots, gen, rng)).slice(0, SHIFT_LEN);
 }
 
 function buildTestQueue({ kind, topic, words, exercises, info, getState, rng }) {
   const n = kind === 'test' ? TEST_LEN : EXAM_LEN;
-  const pool = words.filter(
-    (w) =>
-      (kind === 'exam' || w.topic === topic) &&
-      (usableWith(w, WRITING, exercises, info) || usableWith(w, RECOGNITION, exercises, info)),
-  );
-  const items = shuffle(selectItems(pool, getState, n, { maxNew: Infinity, rng }), rng);
-  const nWriting = Math.round(items.length * 0.7);
-  return items.map((item, i) => {
-    const [first, second] = i < nWriting ? [WRITING, RECOGNITION] : [RECOGNITION, WRITING];
-    const type =
-      chooseType(item, first, exercises, info, rng) || chooseType(item, second, exercises, info, rng);
-    return { item, type, retry: false };
+  const usable = (w) => {
+    const p = planFor(w.topic);
+    return usableWith(w, p.writing, exercises, info) || usableWith(w, p.recognition, exercises, info);
+  };
+  const pool = words.filter((w) => (kind === 'exam' || w.topic === topic) && usable(w));
+  const genPool = kind === 'test' ? pool.filter((w) => w.gen) : [];
+  const itemPool = pool.filter((w) => !genPool.includes(w));
+  const nGen = genPool.length ? Math.round(n * planFor(topic).genShare) : 0;
+  const items = selectItems(itemPool, getState, n - nGen, { maxNew: Infinity, rng });
+  // Small pools whose questions are generated (prepositions: a new room each time) may repeat.
+  const repeatable = items
+    .filter((w) => w.kind === 'prep')
+    .sort((a, b) => (getState(a.id)?.box ?? 0) - (getState(b.id)?.box ?? 0));
+  for (let i = 0; kind === 'test' && repeatable.length && items.length < n - nGen; i++) {
+    items.push(repeatable[i % repeatable.length]);
+  }
+  const all = shuffle([...items, ...pickGenerated(genPool, n - items.length, getState, rng)], rng);
+  const nWriting = Math.round(all.length * 0.7);
+  const typeFor = (item, i) => {
+    const p = planFor(item.topic);
+    const [first, second] = i < nWriting ? [p.writing, p.recognition] : [p.recognition, p.writing];
+    return chooseType(item, first, exercises, info, rng) || chooseType(item, second, exercises, info, rng);
+  };
+  const seen = new Set();
+  const queue = all.map((item, i) => {
+    let slot = mkSlot(item, typeFor(item, i), exercises, info, rng);
+    for (let tries = 0; tries < 8 && seen.has(slotKey(slot)); tries++) slot = mkSlot(item, slot.type, exercises, info, rng);
+    seen.add(slotKey(slot));
+    return slot;
   });
+  return spread(queue);
 }
 
 /**
@@ -182,7 +323,7 @@ export function createShift(o) {
   const { kind, topic = null, words, exercises, getState, ttsAvailable = false, rng = Math.random } = o;
   const now = o.now || Date.now;
   const station = kind === 'test' ? TEST_STATION : o.station ?? 0;
-  const mode = shiftMode(kind, station);
+  const mode = shiftMode(kind, station, topic);
   const info = { words, ttsAvailable, mode };
   const args = { kind, topic, station, words, exercises, info, getState, rng };
   const queue = kind === 'station' ? buildStationQueue(args) : buildTestQueue(args);
@@ -237,8 +378,8 @@ export function createShift(o) {
       } else {
         this.combo = 0;
         this.mistakes++;
-        wrong.set(item.id, item);
-        if (mode.retry) this.queue.push({ item, type: slot.type, retry: true });
+        wrong.set(item.id, { item, params: slot.params });
+        if (mode.retry) this.queue.push({ item, type: slot.type, retry: true, params: slot.params });
       }
       this.bestCombo = Math.max(this.bestCombo, this.combo);
       return { gained, bonus, combo: this.combo };
@@ -262,7 +403,8 @@ export function createShift(o) {
         percent,
         exercises: this.index,
         bestCombo: this.bestCombo,
-        wrongItems: [...wrong.values()],
+        wrongItems: [...wrong.values()].map((w) => w.item),
+        wrongDetails: [...wrong.values()],
         ms: now() - this.startedAt,
       };
     },

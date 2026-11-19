@@ -15,7 +15,8 @@
 // Special entries:
 //   kind: 'gap'   — only used as a fill-the-gap sentence (e.g. a/an, by/on).
 //                   Needs an explicit id and usually `choices`.
-//   kind: 'prep'  — prepositions, practised with the room scene (Milestone 2).
+//   kind: 'prep'  — prepositions, practised with the room scene (js/gfx/room.js).
+//   kind: 'clock' — clock patterns; the times themselves are generated (js/time.js).
 //
 // The id is created automatically as "<topic>:<english-word>" unless given.
 
@@ -85,20 +86,28 @@ const HOUSE = [
 ];
 
 const PREPOSITIONS = [
-  { en: 'in', de: 'in', kind: 'prep' },
-  { en: 'on', de: 'auf', kind: 'prep' },
-  { en: 'under', de: 'unter', kind: 'prep' },
-  { en: 'next to', de: 'neben', kind: 'prep' },
-  { en: 'behind', de: 'hinter', kind: 'prep' },
-  { en: 'in front of', de: 'vor', kind: 'prep' },
-  { en: 'between', de: 'zwischen', kind: 'prep' },
+  { id: 'prep:in', en: 'in', de: 'in', kind: 'prep' },
+  { id: 'prep:on', en: 'on', de: 'auf', kind: 'prep' },
+  { id: 'prep:under', en: 'under', de: 'unter', kind: 'prep' },
+  { id: 'prep:next-to', en: 'next to', de: 'neben', kind: 'prep' },
+  { id: 'prep:behind', en: 'behind', de: 'hinter', kind: 'prep' },
+  { id: 'prep:in-front-of', en: 'in front of', de: 'vor', kind: 'prep' },
+  { id: 'prep:between', en: 'between', de: 'zwischen', kind: 'prep' },
 ];
 
 const NUMBERS_EN = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 const NUMBERS_DE = ['eins', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun', 'zehn', 'elf', 'zwölf'];
-const TIME = NUMBERS_EN.map((en, i) => ({
-  en, de: NUMBERS_DE[i], img: `text:${i + 1}`, sentence: `It's [${en}] o'clock.`,
-}));
+const TIME = [
+  // Clock patterns: the exercises make up a new time (hour 1–12) every time.
+  { id: 'time:oclock', kind: 'clock', gen: true, pattern: 'oclock', en: "o'clock", de: '… Uhr' },
+  { id: 'time:quarter-past', kind: 'clock', gen: true, pattern: 'quarter-past', en: 'quarter past', de: 'Viertel nach' },
+  { id: 'time:half-past', kind: 'clock', gen: true, pattern: 'half-past', en: 'half past', de: 'halb (Achtung: half past seven = halb acht!)' },
+  { id: 'time:quarter-to', kind: 'clock', gen: true, pattern: 'quarter-to', en: 'quarter to', de: 'Viertel vor' },
+  // Numbers as words, shown as a digit.
+  ...NUMBERS_EN.map((en, i) => ({
+    en, de: NUMBERS_DE[i], img: `text:${i + 1}`, sentence: `It's [${en}] o'clock.`,
+  })),
+];
 
 const TRANSPORT = [
   { en: 'car', de: 'Auto', img: 'emoji:🚗', sentence: 'My dad drives a [car].' },

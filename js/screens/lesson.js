@@ -9,16 +9,19 @@ import { EXERCISES } from '../exercises/index.js';
 import { createShift, commitShift } from '../lesson.js';
 import { diffExpected } from '../check.js';
 import { tts, speak, stopSpeaking, prefetchSpeech } from '../tts.js';
-import { parseSentence } from '../content.js';
+import { slotSpeech } from '../content.js';
 import { sfx } from '../audio.js';
 import { emojiDataURL } from '../gfx/emoji.js';
 
-const WRITING_TYPES = new Set(['tiles', 'type', 'fill-gap']);
+// Letter-by-letter answers: show the right spelling with the wrong letters marked.
+const DIFF_TYPES = new Set(['tiles', 'type', 'fill-gap', 'copy', 'clock-write', 'prep-write']);
+// Other answers where showing "you wrote / chose …" helps.
+const GIVEN_TYPES = new Set(['sentence-order']);
 
 let cleanup = [];
 
 export default {
-  show(root, { kind = 'station', topic = null, station = 0 } = {}) {
+  show(root, { kind = 'station', topic = null, station = 0, only = null } = {}) {
     const shift = createShift({
       kind,
       topic,
@@ -28,6 +31,14 @@ export default {
       getState: itemState,
       ttsAvailable: tts.available,
     });
+    if (only && EXERCISES[only]) {
+      // Dev shortcut (?ex=clock-set): use one exercise type wherever it fits.
+      for (const slot of shift.queue) {
+        if (!EXERCISES[only].canUse(slot.item, shift.info)) continue;
+        slot.type = only;
+        slot.params = EXERCISES[only].makeParams?.(slot.item, { rng: Math.random, mode: shift.mode, words: WORDS }) ?? null;
+      }
+    }
     if (!shift.queue.length) {
       toast(T.comingSoon);
       go('map');
@@ -94,13 +105,16 @@ export default {
         words: WORDS,
         mode: shift.mode,
         rng: Math.random,
+        params: slot.params,
         setReady,
         submit: () => doCheck(),
       };
       if (slot.retry) host.append(el('div.retry-tag', {}, '🔁 Nochmal!'));
       handle = ex.render(host, slot.item, ctx);
-      foot.hidden = !!(handle.usesKeyboard || ex.usesKeyboard);
-      host.classList.toggle('with-keyboard', foot.hidden);
+      const kb = !!(handle.usesKeyboard ?? ex.usesKeyboard);
+      foot.hidden = kb || !!handle.noCheck;
+      host.classList.toggle('with-keyboard', kb);
+      host.dataset.type = slot.type;
       updateTop();
     };
 
@@ -109,6 +123,7 @@ export default {
       checked = true;
       const slot = shift.current;
       const res = handle.check();
+      if (window.__pm?.forceCorrect) Object.assign(res, { correct: true, caseOnly: false }); // ?debug smoke tests
       handle.reveal?.(res);
       const r = shift.answer(res);
       state.coins += r.gained;
@@ -131,18 +146,23 @@ export default {
       } else {
         sfx.wrong();
         parts.push(el('div.fb-title', {}, res.caseOnly ? T.wrongCase : T.wrong));
-        const showDiff = WRITING_TYPES.has(slot.type) && res.given;
-        const answer = res.sentence
-          ? el('span.word', {}, [
-            res.sentence.before,
-            el('span.fb-gap', {}, showDiff ? diffNode(diffExpected(res.given, res.expected)) : res.expected),
-            res.sentence.after,
-          ])
-          : el('span.word', {}, showDiff ? diffNode(diffExpected(res.given, res.expected)) : res.expected);
-        parts.push(el('div.fb-answer', {}, [el('span.fb-label', {}, T.rightIs), answer, speakBtn(say)]));
-        if (showDiff) {
+        const showDiff = DIFF_TYPES.has(slot.type) && res.given;
+        const shown = showDiff ? diffNode(diffExpected(res.given, res.expected)) : res.expected;
+        const answer = res.answerNode
+          ? res.answerNode
+          : res.sentence
+            ? el('span.word', {}, [res.sentence.before, el('span.fb-gap', {}, shown), res.sentence.after])
+            : el('span.word', {}, shown);
+        parts.push(el('div.fb-answer', {}, [
+          el('span.fb-label', {}, res.answerLabel || T.rightIs),
+          answer,
+          res.extra ? el('span.fb-extra', {}, res.extra) : null,
+          speakBtn(say),
+        ]));
+        if ((showDiff || GIVEN_TYPES.has(slot.type)) && res.given) {
           parts.push(el('div.fb-given', {}, [el('span.fb-label', {}, T.youWrote), el('span.word.strike', {}, res.given)]));
         }
+        if (res.note) parts.push(res.note);
         setTimeout(() => speak(say), 250);
       }
       const nextBtn = button('btn.btn-next', T.next, () => next());
@@ -215,9 +235,7 @@ export default {
 
     // Let Piper prepare the words of this shift in the background, in queue order.
     const texts = [];
-    for (const { item } of shift.queue) {
-      texts.push(item.kind === 'gap' ? null : item.en, parseSentence(item.sentence)?.full);
-    }
+    for (const slot of shift.queue) texts.push(...slotSpeech(slot));
     if (line && kind === 'station') texts.push(`Next station: ${line.stations[station + 1]}!`);
     texts.push('Well done!', 'Good job!');
     prefetchSpeech([...new Set(texts.filter(Boolean))]);

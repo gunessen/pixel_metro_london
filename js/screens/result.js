@@ -6,6 +6,16 @@ import { state } from '../state.js';
 import { LINE_BY_TOPIC, TEST_STATION } from '../data/lines.js';
 import { displayText, speechText } from '../content.js';
 import { picture } from '../gfx/picture.js';
+import { createClock } from '../gfx/clock.js';
+import { createRoom } from '../gfx/room.js';
+import { digital } from '../time.js';
+
+/** Small picture for a wrong answer: the clock / room it was about, or the word's picture. */
+function wrongPicture(item, params) {
+  if (item.kind === 'clock' && params) return createClock({ h: params.h, m: params.m, cls: 'clock-mini' }).node;
+  if (item.kind === 'prep' && params) return createRoom(params, { cls: 'room-mini' }).node;
+  return picture(item);
+}
 import { speak } from '../tts.js';
 import { sfx } from '../audio.js';
 
@@ -34,8 +44,13 @@ export default {
     const wrongList = s.wrongItems.length
       ? el('div.result-wrong', {}, [
         el('div.result-wrong-title', {}, T.practiseWords),
-        el('div.wrong-list', {}, s.wrongItems.map((it) =>
-          el('div.wrong-item', {}, [picture(it), el('span.word', {}, displayText(it)), el('span.wrong-de', {}, it.de), speakBtn(speechText(it))]))),
+        el('div.wrong-list', {}, (s.wrongDetails || s.wrongItems.map((item) => ({ item }))).map(({ item: it, params }) =>
+          el('div.wrong-item', {}, [
+            wrongPicture(it, params),
+            el('span.word', {}, displayText(it, params)),
+            el('span.wrong-de', {}, it.kind === 'clock' && params ? digital(params.h, params.m) : it.de),
+            speakBtn(speechText(it, params)),
+          ]))),
       ])
       : el('div.result-perfect', {}, T.noMistakes);
 

@@ -534,3 +534,155 @@ button { font: inherit; color: inherit; touch-action: manipulation; cursor: poin
 .voice-progress-fill { height: 100%; background: var(--blue); }
 .ok-text { color: #7ee2a0; }
 .voice-pill { font-size: 0.9rem; color: var(--muted); background: var(--ink); padding: 0.3rem 0.7rem; }
+
+/* =====================================================================
+   Milestone 2: clock, room, word tiles, copy, pairs
+   ===================================================================== */
+:root {
+  --pair-1: #38b764; --pair-2: #41a6f6; --pair-3: #ffcd75; --pair-4: #ef7d57; --pair-5: #b98ce0;
+}
+.word-mid { font-size: 1.8rem; }
+.ex-answer-wide { max-width: 64%; }
+.ex-prompt-left { justify-content: flex-start; min-height: 3rem; }
+.ex-tools { display: flex; gap: 0.6rem; align-items: center; min-height: 48px; }
+
+/* feedback extras */
+.fb-extra {
+  font-family: var(--f-word); font-weight: 700; font-size: 1.3rem;
+  background: var(--ink); color: var(--yellow); padding: 0.1rem 0.6rem;
+}
+.fb-note {
+  font-size: 1.25rem; color: var(--yellow);
+  background: #0004; border-left: 0.35rem solid var(--yellow);
+  padding: 0.3rem 0.7rem; align-self: flex-start;
+}
+.fb-note .word { font-size: 1.3rem; color: var(--paper); }
+.fb-note b { font-family: var(--f-word); font-size: 1.4rem; color: var(--paper); text-decoration: underline; }
+.fb-pairs { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+.fb-pair { display: flex; align-items: center; gap: 0.4rem; }
+.fb-pair .pic { --pic: 3rem; border-width: 2px; }
+.fb-pair .word { font-size: 1.5rem; color: var(--paper); }
+
+/* ---------- clock ---------- */
+.clock {
+  --size: 17rem;
+  position: relative; width: var(--size); height: var(--size); flex: none;
+}
+.clock-small { --size: 13rem; }
+.clock-canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.clock-num {
+  position: absolute; transform: translate(-50%, -50%);
+  font-family: var(--f-word); font-weight: 700; color: var(--ink);
+  font-size: calc(var(--size) * 0.08); line-height: 1; pointer-events: none;
+}
+.clock-interactive { cursor: grab; touch-action: none; }
+.clock-interactive[data-drag] { cursor: grabbing; }
+.clock.disabled { pointer-events: none; }
+.clock-mini { --size: 3.2rem; }
+.clock-mini .clock-num { display: none; }
+.ex-clock { display: flex; flex-direction: column; align-items: center; }
+.digital-clock {
+  font-family: var(--f-word); font-weight: 700; font-size: 5rem; letter-spacing: 0.08em;
+  color: #7ee2a0; background: #10131f; padding: 1rem 2rem;
+  border: var(--px) solid var(--ink); box-shadow: inset 0 0 0 0.35rem #333c57, 0 var(--px) 0 var(--ink);
+}
+.options.options-time { grid-template-columns: repeat(2, minmax(12rem, auto)); }
+.options-time .option-word { font-size: 1.5rem; }
+
+.hand-controls { display: flex; flex-direction: column; gap: 1.2rem; }
+.hand-row { display: flex; align-items: center; gap: 0.8rem; }
+.hand-label { display: flex; align-items: center; gap: 0.5rem; font-size: 1.2rem; width: 15rem; }
+.hand-chip { width: 1.6rem; height: 0.7rem; border: 2px solid var(--ink); }
+.btn-step { min-width: 4rem; font-size: 1.6rem; padding: 0.3rem 0.8rem; }
+
+/* ---------- word tiles ---------- */
+.wt-answer {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+  min-height: 4.2rem; min-width: 22rem; padding: 0.4rem 0.6rem;
+  background: #0003; border-bottom: var(--px) solid var(--muted);
+}
+.wt-answer.empty::after { content: '…'; color: var(--muted); font-size: 2rem; }
+.wt-answer.ok { border-bottom-color: var(--green); background: #38b76433; }
+.wt-answer.bad { border-bottom-color: var(--red); background: #b13e5333; }
+.wt-pool { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; max-width: 56rem; }
+.wt-tile {
+  min-height: 3.2rem; padding: 0.2rem 0.9rem; font-size: 1.8rem;
+  background: var(--yellow); color: var(--ink);
+  border: 3px solid var(--ink); box-shadow: 0 var(--px) 0 var(--ink);
+}
+.wt-answer .wt-tile { background: var(--paper); }
+.wt-tile:active { transform: translateY(var(--px)); box-shadow: none; }
+.wt-tile.used { visibility: hidden; }
+.locked .wt-tile { pointer-events: none; }
+
+/* ---------- copy ---------- */
+.copy-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem;
+  background: var(--panel); padding: 0.5rem 1rem; border: var(--px) solid var(--ink); min-width: 18rem;
+}
+.copy-label { font-size: 1rem; color: var(--yellow); }
+.copy-word { font-size: 2.6rem; color: var(--paper); min-height: 3.2rem; }
+.copy-bar { width: 100%; height: 0.45rem; background: var(--ink); }
+.copy-bar-fill { height: 100%; width: 100%; background: var(--yellow); }
+.copy-card.hidden-word .copy-word { visibility: hidden; }
+.copy-card.hidden-word .copy-bar, .copy-card.hidden-word .copy-label { visibility: hidden; }
+
+/* ---------- match pairs ---------- */
+.pairs { display: flex; flex-direction: column; gap: 1.6rem; align-items: center; flex: 1; justify-content: center; }
+.pairs-row { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+.pair-pic .pic { --pic: 7.5rem; background: transparent; border: 0; }
+.pair-word { font-size: 1.45rem; padding: 0.7rem 1rem; }
+.option.matched {
+  background: var(--pair); outline: var(--px) solid var(--pair); color: var(--ink);
+  opacity: 0.85; pointer-events: none;
+}
+.option.shake { animation: shake 0.4s; background: var(--red); }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+/* ---------- room (prepositions) ---------- */
+.ex-room { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.room {
+  position: relative; width: 34rem; aspect-ratio: 200 / 112;
+  border: var(--px) solid var(--ink); box-shadow: 0 var(--px) 0 var(--ink); flex: none;
+}
+.ex-room-big .room { width: 42rem; }
+.ex-room-small .room { width: 26rem; }
+.room-canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.room-mini { width: 5.7rem; border-width: 2px; box-shadow: none; }
+.options.options-prep { display: flex; flex-direction: column; gap: 0.8rem; align-items: stretch; max-width: 30rem; }
+.options-prep .option-word { font-size: 1.35rem; padding: 0.6rem 1rem; text-align: left; }
+
+.room-zone {
+  position: absolute; padding: 0; background: #ffffff1a;
+  border: 3px dashed #ffffffcc; border-radius: 0.3rem;
+}
+.room-zone.has-obj { background: transparent; border-color: transparent; }
+.room.dragging .room-zone { border-color: var(--yellow); }
+.room-zone.hover { background: #ffcd7566; border-style: solid; }
+.room-zone.ok { border: 3px solid var(--green); background: #38b76433; }
+.room-zone.bad { border: 3px solid var(--red); background: #b13e5333; }
+.room.locked .room-zone { pointer-events: none; }
+.room.locked .room-zone:not(.ok):not(.bad) { border-color: transparent; background: transparent; }
+.room-hint { font-size: 0.95rem; color: var(--muted); }
+.prep-place-row { gap: 1.5rem; }
+.prep-tray {
+  width: 7rem; height: 8rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem;
+  background: var(--panel); border: var(--px) dashed var(--yellow); touch-action: none; cursor: grab;
+}
+.prep-tray.empty .prep-obj { visibility: hidden; }
+.prep-tray.empty { border-color: var(--panel-hi); }
+.prep-obj { width: 4.5rem; height: 4.5rem; font-size: 3rem; pointer-events: none; }
+.prep-tray-label { font-size: 0.95rem; color: var(--yellow); }
+.prep-ghost {
+  position: fixed; z-index: 100; pointer-events: none; image-rendering: pixelated;
+  filter: drop-shadow(0 6px 0 #0006);
+}
+
+@media (max-height: 650px) {
+  .clock { --size: 14rem; }
+  .clock-small { --size: 11rem; }
+  .room { width: 30rem; }
+  .ex-room-big .room { width: 36rem; }
+  .ex-room-small .room { width: 22rem; }
+  .pair-pic .pic { --pic: 6rem; }
+}

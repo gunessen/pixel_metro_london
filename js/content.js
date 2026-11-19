@@ -1,6 +1,8 @@
 // Pure helpers about vocabulary items (no DOM): distractors, sentences, display text.
 import { PLACEHOLDERS } from './gfx/sprites.js';
 import { shuffle } from './srs.js';
+import { timeToWords } from './time.js';
+import { whereSentence, whereQuestion, putSentence } from './prep.js';
 
 /** Item can be shown as a picture and used in word exercises. */
 export function isWordItem(item) {
@@ -62,13 +64,27 @@ export function gapAlternatives(item) {
   return (item.alt || []).filter((a) => !/^the /i.test(a));
 }
 
-/** How to show an item in lists (result screen, parent area). */
-export function displayText(item) {
+/** How to show an item in lists (result screen, parent area). `params` = the generated time/scene. */
+export function displayText(item, params = null) {
+  if (item.kind === 'clock' && params) return timeToWords(params.h, params.m);
+  if (item.kind === 'prep' && params) return whereSentence(params);
   if (item.kind === 'gap') return parseSentence(item.sentence)?.full ?? item.en;
   return item.en;
 }
 
 /** Text spoken for an item. */
-export function speechText(item) {
-  return displayText(item);
+export function speechText(item, params = null) {
+  return displayText(item, params);
+}
+
+/** Everything that may be spoken during one queue slot (for Piper prefetching). */
+export function slotSpeech({ item, params }) {
+  if (item.kind === 'clock' && params) {
+    const w = timeToWords(params.h, params.m);
+    return [w, `It's ${w}.`, 'What time is it?'];
+  }
+  if (item.kind === 'prep' && params) {
+    return [whereSentence(params), whereQuestion(params), putSentence(params)];
+  }
+  return [item.kind === 'gap' ? null : item.en, parseSentence(item.sentence)?.full];
 }

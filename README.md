@@ -16,7 +16,8 @@ python3 -m http.server 8000
 - `tests.html`: unit tests (answer checker, spaced repetition, lesson engine, vocabulary data).
 - Dev shortcuts: `index.html?go=map`, `index.html?go=lesson&topic=house&station=3`,
   `index.html?go=lesson&kind=test&topic=jobs`, `index.html?go=lesson&kind=exam`.
-  Add `&debug` to expose test hooks on `window.__pm`.
+  Add `&ex=clock-set` (any exercise id) to use only that exercise type where it fits, and
+  `&debug` to expose test hooks on `window.__pm`.
 
 ## Edit the vocabulary
 
@@ -32,6 +33,14 @@ All words are in [js/data/words.js](js/data/words.js). One line per word:
 - `img`: `'emoji:🚌'`, `'sprite:name'` (see [js/gfx/sprites.js](js/gfx/sprites.js)) or `'text:7'`.
 
 Open `tests.html` after editing. It checks for duplicate ids and broken sentences.
+
+Two topics are special and need no word list:
+
+- **Clock Line** (`time`): the four `kind: 'clock'` items are the patterns (o'clock, quarter past,
+  half past, quarter to). Every exercise makes up a new hour; the text is generated in
+  [js/time.js](js/time.js). The number words one–twelve are normal words.
+- **Where Line** (`prepositions`): rooms are generated from [js/prep.js](js/prep.js) (which furniture
+  allows which preposition, the objects) and drawn by [js/gfx/room.js](js/gfx/room.js).
 
 ## Speech (Piper)
 
@@ -49,5 +58,6 @@ so the game works under `https://<user>.github.io/<repo>/`. On the tablet, open 
 
 ## Status
 
-Milestone 1 (playable core) is done. Coming next: clock and preposition exercises (Milestone 2),
-then real pixel sprites, the map, the shop, the parent area and offline/PWA support (Milestone 3).
+Milestones 1 and 2 are done: all 7 lines are playable, with all 14 exercise types from the plan plus
+`prep-write` (write the preposition into a sentence about the room). Coming next (Milestone 3): real pixel
+sprites, the pixel map, the shop, the parent area and offline/PWA support.

@@ -29,6 +29,7 @@ Promise.race([fontsReady, new Promise((r) => setTimeout(r, 1500))]).then(() => {
         kind: params.get('kind') || 'station',
         topic: params.get('topic'),
         station: Number(params.get('station') || 0),
+        only: params.get('ex'),
       }));
   } else if (target === 'map' || target === 'settings') {
     initTTS().then(() => go(target));

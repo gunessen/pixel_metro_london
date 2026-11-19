@@ -14,6 +14,15 @@ export function getEmojiPx() {
 
 /** Returns a data URL, or null if the device cannot draw this emoji. */
 export function emojiDataURL(ch, px = defaultPx) {
+  return render(ch, px)?.url ?? null;
+}
+
+/** The pixelated emoji as a px×px canvas (for drawing into scenes), or null. */
+export function emojiCanvas(ch, px = defaultPx) {
+  return render(ch, px)?.canvas ?? null;
+}
+
+function render(ch, px) {
   const key = px + '|' + ch;
   if (cache.has(key)) return cache.get(key);
   // Draw big first (sharper glyph), then downsample to px×px.
@@ -47,7 +56,7 @@ export function emojiDataURL(ch, px = defaultPx) {
   }
   ctx.putImageData(img, 0, 0);
   // Nothing drawn, or only a monochrome "tofu" box → treat as unsupported.
-  const url = visible > 4 && colourful > 0 ? c.toDataURL() : null;
-  cache.set(key, url);
-  return url;
+  const res = visible > 4 && colourful > 0 ? { url: c.toDataURL(), canvas: c } : null;
+  cache.set(key, res);
+  return res;
 }

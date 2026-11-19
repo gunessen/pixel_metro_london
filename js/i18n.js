@@ -27,6 +27,27 @@ export const T = {
   tiles: 'Bau das Wort aus den Buchstaben.',
   type: 'Schreib das Wort.',
   'fill-gap': 'Ergänze den Satz.',
+  copy: 'Merk dir das Wort und schreib es ab.',
+  'sentence-order': 'Bring die Wörter in die richtige Reihenfolge.',
+  'match-pairs': 'Finde die Paare.',
+  'clock-read': 'Wie spät ist es?',
+  'clock-write': 'Schreib die Uhrzeit auf Englisch.',
+  'clock-set': 'Stell die Uhr.',
+  'prep-pick': (objDe) => `Wo ist ${objDe}?`,
+  'prep-place': 'Lies und zieh den Gegenstand an die richtige Stelle.',
+  'prep-write': 'Wo ist der Gegenstand? Ergänze den Satz.',
+
+  // exercise details
+  memorize: 'Merk es dir!',
+  peek: 'Nochmal zeigen',
+  hourHand: 'Stundenzeiger (kurz)',
+  minuteHand: 'Minutenzeiger (lang)',
+  dragMe: 'Zieh mich!',
+  orTap: 'oder tippe auf ein Feld',
+  pairsMixed: 'Diese Paare hast du verwechselt:',
+  halfPastWarn: 'Achtung:',
+  halfPastDe: 'auf Deutsch',
+  tapWords: 'Tippe die Wörter an.',
 
   // lesson
   exitConfirm: 'Wirklich beenden?',
