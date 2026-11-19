@@ -396,10 +396,20 @@ Total: roughly 140 items. Shifts draw from these with SRS, so a topic's vocabula
 - Chiptune sound effects generated with WebAudio oscillators (no audio files): correct, wrong, coin, tile click, station chime ("ding-dong"), train arrival.
 - One global mute in Settings.
 
-### 7.6 Text-to-speech (`js/tts.js`)
-- Uses `speechSynthesis`. Prefer `en-GB` voices, then any `en-*`. Speed defaults to 0.9 (0.7 for "slow" mode).
-- Load voices asynchronously, waiting for `voiceschanged` (needed on Android Chrome).
-- If **no English voice** is found, disable `listen-pick` exercises and the 🔊 buttons, and show a hint in Settings: "Keine englische Stimme gefunden. Bitte in Android unter Einstellungen → Sprache → Sprachausgabe Englisch installieren."
+### 7.6 Text-to-speech (`js/tts.js`, `js/piper.js`, `js/piper-worker.js`)
+- **Piper neural TTS in the browser** (the device voices sound bad). Pipeline in a classic Web Worker:
+  espeak-ng phonemizer compiled to WASM (`@diffusionstudio/piper-wasm` 1.0.0) → phoneme ids →
+  Piper VITS model via `onnxruntime-web` 1.22 (WASM, **single thread**, because GitHub Pages cannot
+  enable cross-origin isolation). Engine files are vendored under `vendor/`.
+- Voices come from `rhasspy/piper-voices` **v1.0.0** on Hugging Face (British English; default
+  `en_GB-jenny_dioco-medium`, ~60 MB). Downloaded once and kept in Cache Storage (`piper-voices-v1`);
+  only the selected voice is kept. Voice choice in Settings.
+- A synthesis queue: the text being spoken jumps the queue; at the start of a shift all its words and
+  sentences are prefetched in the background. Audio is cached in memory and played through WebAudio.
+- Slow mode uses Piper's `length_scale` (normal 1.0, slow ≈ 1.3), not playback rate.
+- **Fallback:** while the voice is downloading, or if Piper fails, use `speechSynthesis` (prefer `en-GB`,
+  wait for `voiceschanged` on Android). If no English speech is possible at all, disable `listen-pick`
+  and the 🔊 buttons and show the hint in Settings: "Keine englische Stimme gefunden. …".
 - Speak the correct answer automatically on wrong answers. Every displayed English word has a 🔊 button.
 - Special phrases: "Next station: …", "Mind the gap!" (when starting a shift), "Well done!"
 
