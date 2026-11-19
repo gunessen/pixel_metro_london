@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixel Metro London – Tests</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #1a1c2c; color: #f4f4f4; padding: 1rem 2rem; }
+    h1 { font-size: 1.4rem; }
+    .ok { color: #38b764; }
+    .bad { color: #ef7d57; }
+    h2 { font-size: 1.1rem; margin: 1.2rem 0 0.3rem; color: #ffcd75; }
+    li { margin: 0.15rem 0; }
+    small { color: #94b0c2; }
+  </style>
+</head>
+<body>
+  <h1 id="summary">Tests laufen…</h1>
+  <div id="out"></div>
+  <script type="module">
+    import { runTests } from './js/tests.js';
+    const results = runTests();
+    const out = document.getElementById('out');
+    let group = null;
+    let ul;
+    for (const r of results) {
+      if (r.group !== group) {
+        group = r.group;
+        const h = document.createElement('h2');
+        h.textContent = group;
+        ul = document.createElement('ul');
+        out.append(h, ul);
+      }
+      const li = document.createElement('li');
+      li.className = r.ok ? 'ok' : 'bad';
+      li.textContent = (r.ok ? '✔ ' : '✘ ') + r.name;
+      if (!r.ok) {
+        const s = document.createElement('small');
+        s.textContent = ' — ' + r.msg;
+        li.append(s);
+      }
+      ul.append(li);
+    }
+    const failed = results.filter((r) => !r.ok).length;
+    const sum = document.getElementById('summary');
+    sum.textContent = failed ? `${failed} von ${results.length} Tests fehlgeschlagen` : `Alle ${results.length} Tests bestanden ✔`;
+    sum.className = failed ? 'bad' : 'ok';
+    document.title = failed ? `FAIL ${failed}` : `PASS ${results.length}`;
+  </script>
+</body>
+</html>
